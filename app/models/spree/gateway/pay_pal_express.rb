@@ -70,6 +70,7 @@ module Spree
       end
     end
 
+    #Not compatible with used version of Spree, just kept for reference
     def refund(payment, amount)
       refund_type = payment.amount == amount.to_f ? "Full" : "Partial"
       refund_transaction = provider.build_refund_transaction({
@@ -99,6 +100,54 @@ module Spree
       end
       refund_transaction_response
     end
+    
+    #Refund function
+    def  credit(amount, response_code, refund_options)
+      raise Core::GatewayError.new('Originator details is missing in third parameter, not able to proceed refund. Contact the dev team') unless refund_options[:originator].present?
+      refund_type = "Partial"
+      refund_transaction = provider.build_refund_transaction({
+        :TransactionID => response_code,
+        :RefundType => refund_type,
+        :Amount => {
+          :currencyID => 'USD',
+          :value => refund_options[:originator].amount.to_f },
+        :RefundSource => "any" })
+      refund_transaction_response = provider.refund_transaction(refund_transaction)
+      if refund_transaction_response.success?
+        #prepare resonse in spree required format
+        success_msg refund_transaction_response
+      else
+        #Transaction failed
+        error_msg refund_transaction_response
+      end
+    end#def credit
+    private
+      #prepare success message
+      def success_msg transaction_response
+        Class.new do
+          def initialize(t_id)
+            @id = t_id
+          end
+          def success?; true; end
+          def authorization; @id end
+        end.new(transaction_response.RefundTransactionID)
+      end
+      #prepare response according to spree
+      def error_msg transaction_response
+        Class.new do
+          attr_reader :params
+          def initialize(r)
+            if r.Errors.present?
+              m = r.Errors.first
+              @params = {'message' =>"#{m.ShortMessage}: #{m.LongMessage}", 'response_reason_text' => m.LongMessage}
+            else
+              #Didn't get error message in response
+              @params = {'message' =>'Unexpected Error:Even the error message is not found in response' ,'response_reason_text' => 'Unexpected Error'}
+            end 
+          end
+          def success?; false; end
+        end.new(transaction_response)
+      end
   end
 end
 
