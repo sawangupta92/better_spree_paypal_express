@@ -102,16 +102,16 @@ module Spree
     end
     
     #Refund function
-    def  credit(amount, response_code, refund_options)
+    def credit(amount, response_code, refund_options)
       raise Core::GatewayError.new('Originator details is missing in third parameter, not able to proceed refund. Contact the dev team') unless refund_options[:originator].present?
       refund_type = "Partial"
       refund_transaction = provider.build_refund_transaction({
-        :TransactionID => response_code,
-        :RefundType => refund_type,
-        :Amount => {
-          :currencyID => 'USD',
-          :value => refund_options[:originator].amount.to_f },
-        :RefundSource => "any" })
+        TransactionID: response_code,
+        RefundType: refund_type,
+        Amount: {
+          currencyID: 'USD',
+          value: refund_options[:originator].amount.to_f },
+        RefundSource: 'any' })
       refund_transaction_response = provider.refund_transaction(refund_transaction)
       if refund_transaction_response.success?
         #prepare resonse in spree required format
@@ -120,7 +120,7 @@ module Spree
         #Transaction failed
         error_msg refund_transaction_response
       end
-    end#def credit
+    end
     private
       #prepare success message
       def success_msg transaction_response
@@ -136,13 +136,13 @@ module Spree
       def error_msg transaction_response
         Class.new do
           attr_reader :params
-          def initialize(r)
-            if r.Errors.present?
-              m = r.Errors.first
-              @params = {'message' =>"#{m.ShortMessage}: #{m.LongMessage}", 'response_reason_text' => m.LongMessage}
+          def initialize(response)
+            if response.Errors.present?
+              m = response.Errors.first
+              @params = {'message' => "#{m.ShortMessage}: #{m.LongMessage}", 'response_reason_text' => m.LongMessage}
             else
               #Didn't get error message in response
-              @params = {'message' =>'Unexpected Error:Even the error message is not found in response' ,'response_reason_text' => 'Unexpected Error'}
+              @params = {'message' => 'Unexpected Error:Even the error message is not found in response', 'response_reason_text' => 'Unexpected Error'}
             end 
           end
           def success?; false; end
